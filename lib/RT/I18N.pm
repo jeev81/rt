@@ -238,23 +238,11 @@ sub SetMIMEEntityToEncoding {
         my $string = $body->as_string or return;
 
         # Convert the body
-        eval {
-            $RT::Logger->debug( "Converting '$charset' to '$enc' for " . $head->mime_type . " - " . ( $head->get('subject') || 'Subjectless message' ) );
+        $RT::Logger->debug( "Converting '$charset' to '$enc' for " . $head->mime_type . " - " . ( $head->get('subject') || 'Subjectless message' ) );
 
-            # NOTE:: see the comments at the end of the sub.
-            Encode::_utf8_off( $string);
-            Encode::from_to( $string, $charset => $enc );
-        };
-
-        if ($@) {
-            $RT::Logger->error( "Encoding error: " . $@ . " defaulting to ISO-8859-1 -> UTF-8" );
-            eval { Encode::from_to( $string, 'iso-8859-1' => $enc ) };
-            if ($@) {
-                $RT::Logger->crit( "Totally failed to convert to utf-8: " . $@ . " I give up" );
-            }
-        }
-
-        # }}}
+        # NOTE:: see the comments at the end of the sub.
+        Encode::_utf8_off( $string);
+        Encode::from_to( $string, $charset => $enc );
 
         my $new_body = MIME::Body::InCore->new( $string);
 
@@ -548,19 +536,8 @@ sub SetMIMEHeadToEncoding {
         $head->delete($tag);
         foreach my $value (@values) {
             if ( $charset ne $enc ) {
-
-                eval {
-                    Encode::_utf8_off($value);
-                    Encode::from_to( $value, $charset => $enc );
-                };
-                if ($@) {
-                    $RT::Logger->error( "Encoding error: " . $@
-                                       . " defaulting to ISO-8859-1 -> UTF-8" );
-                    eval { Encode::from_to( $value, 'iso-8859-1' => $enc ) };
-                    if ($@) {
-                        $RT::Logger->crit( "Totally failed to convert to utf-8: " . $@ . " I give up" );
-                    }
-                }
+                Encode::_utf8_off($value);
+                Encode::from_to( $value, $charset => $enc );
             }
             $value = DecodeMIMEWordsToEncoding( $value, $enc, $tag )
                 unless $preserve_words;
