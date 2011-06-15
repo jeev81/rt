@@ -284,7 +284,7 @@ else {
         }
         push @results, ProcessObjectCustomFieldUpdates( ARGSRef => \%ARGS, Object => $UserObj );
 	} else {
-		push @results, loc('User could not be created: [_1]', $msg);
+		Abort( loc('User could not be created: [_1]', $msg) );
 	}
     } else {
 	    $UserObj->Load($id) || $UserObj->Load($Name) 
