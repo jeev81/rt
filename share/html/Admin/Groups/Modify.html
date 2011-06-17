@@ -63,11 +63,11 @@
 <tr><td align="right">
 <&|/l&>Name</&>:
 </td>
-<td><input name="Name" value="<%$Group->Name||''%>" /></td>
+<td><input name="Name" value="<%$ARGS{Name}||$Group->Name||''%>" /></td>
 </tr>
 <tr>
 <td align="right">
-<&|/l&>Description</&>:</td><td colspan="3"><input name="Description" value="<%$Group->Description||''%>" size="60" /></td>
+<&|/l&>Description</&>:</td><td colspan="3"><input name="Description" value="<%$ARGS{Description}||$Group->Description||''%>" size="60" /></td>
 </tr>
 % my $CFs = $Group->CustomFields;
 % while (my $CF = $CFs->Next) {
@@ -75,15 +75,15 @@
 <% loc($CF->Name) %>:
 </td><td>
 <& /Elements/EditCustomField, CustomField => $CF, 
-                              Object => $Group, 
+                              %ARGS,
                               ($Create ? (NamePrefix => 'Object-RT::Group--CustomField-') 
-                                       : () )&>
+                                       : (Object => $Group) )&>
 </td></tr>
 % }
 <tr>
 <td colspan="2">
 <input type="hidden" class="hidden" name="SetEnabled" value="1" />
-<input type="checkbox" class="checkbox" name="Enabled" value="1" <%$EnabledChecked%> /> <&|/l&>Enabled (Unchecking this box disables this group)</&><br />
+<input type="checkbox" class="checkbox" name="Enabled" value="1" <%$EnabledChecked||''%> /> <&|/l&>Enabled (Unchecking this box disables this group)</&><br />
 </td>
 </tr>
 % $m->callback( %ARGS, GroupObj => $Group, results => \@results );
@@ -105,19 +105,20 @@ if ($Create) {
 } else {
     if ($id eq 'new' ) {
 	my ($create_id, $create_msg) = $Group->CreateUserDefinedGroup(Name => $Name );
-        unless ($create_id) {
-            Abort (loc("Group could not be created: [_1]", $create_msg));
+        if ($create_id) {
+	        $id = $Group->Id;
+            push @results, $create_msg;
         }
-	$id = $Group->Id;
-        push @results, $create_msg;
+        else {
+            push @results, loc("Group could not be created: [_1]", $create_msg);
+        }
     } else {
 	$Group->Load($id) || Abort('Could not load group');
     }
 
-    if ($id) {
-	$title = loc("Modify the group [_1]", $Group->Name);
+    if ($Group->id) {
+	    $title = loc("Modify the group [_1]", $Group->Name);
     }
-
     # If the create failed
     else {
 	$title = loc("Create a new group");
@@ -125,7 +126,7 @@ if ($Create) {
     }
 }
 
-if ($id) {
+if ($Group->id) {
     my @fields = qw(Description Name );
     my @fieldresults = UpdateRecordObject ( AttributesRef => \@fields,
 					    Object => $Group,
@@ -140,29 +141,40 @@ if ($id) {
     if ($dupcheck->Count > 1) {
         push @warnings, loc("There is more than one group with the name '[_1]'.  This may cause inconsistency in parts of the admin interface, and therefore it's recommended you rename the conflicting groups.", $Group->Name);
     }
-}
 
-#we're asking about enabled on the web page but really care about disabled.
-if (defined $Enabled && $Enabled == 1) {
-    $Disabled = 0;
-} else {
-    $Disabled = 1;
-}
-if  ( ($SetEnabled) and ( $Disabled != $Group->Disabled) ) { 
-    my  ($code, $msg) = $Group->SetDisabled($Disabled);
-    push @results, $msg;
+    #we're asking about enabled on the web page but really care about disabled.
+    if (defined $Enabled && $Enabled == 1) {
+        $Disabled = 0;
+    } else {
+        $Disabled = 1;
+    }
+    if  ( ($SetEnabled) and ( $Disabled != $Group->Disabled) ) { 
+        my  ($code, $msg) = $Group->SetDisabled($Disabled);
+        push @results, $msg;
+    }
 }
 
 # This code does automatic redirection if any updates happen.
-MaybeRedirectForResults(
-    Actions     => \@results,
-    Arguments   => { id => $Group->id },
-);
+# but if $Create is still true here, then there must be something wrong
+# and we need to show user the refilled form.
+if ( !$Create ) {
+    MaybeRedirectForResults(
+        Actions     => \@results,
+        Arguments   => { id => $Group->id },
+    );
+}
 
 push @results, @warnings;
 
-unless ($Group->Disabled()) {
-    $EnabledChecked ='checked="checked"';
+if ( $SetEnabled ) {
+    if ( $Enabled ) {
+        $EnabledChecked ='checked="checked"';
+    }
+}
+else {
+    unless ($Group->id && $Group->Disabled()) {
+        $EnabledChecked ='checked="checked"';
+    }
 }
 
 
